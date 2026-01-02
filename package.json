@@ -1,0 +1,14 @@
+{
+  "name": "fans-tracker-auto",
+  "version": "1.0.0",
+  "description": "FansTracker Auto Coins System",
+  "main": "proxy-server.js",
+  "scripts": {
+    "start": "node proxy-server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.2",
+    "cors": "^2.8.5"
+  }
+}
