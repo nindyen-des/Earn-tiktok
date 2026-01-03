@@ -1,203 +1,295 @@
-from flask import Flask, render_template, request, jsonify, Response
-from fb_follower import FacebookFollower
+from flask import Flask, render_template, request, jsonify
+import subprocess
 import threading
 import time
+import os
 import json
 from datetime import datetime
 
 app = Flask(__name__)
-follower_bot = FacebookFollower('proxies.txt')
-current_thread = None
-status_callbacks = []
-active_connections = {}
 
-def status_callback(status_type, message):
-    """Callback function to send status updates to all clients"""
-    timestamp = datetime.now().strftime("%I:%M:%S %p")
-    formatted_message = f"[{timestamp}] {message}"
+# Configuration
+CRON_SCRIPT = "cron_booster.py"
+STATS_FILE = "boost_stats.json"
+CRON_PID_FILE = "cron_booster.pid"
+
+class CronManager:
+    def __init__(self):
+        self.is_running = False
+        self.process = None
+        self.stats = self.load_stats()
     
-    print(f"Status: {status_type} - {formatted_message}")
-    
-    # Send to all connected clients
-    for client_id, callback in list(status_callbacks):
+    def load_stats(self):
         try:
-            callback(status_type, formatted_message)
+            if os.path.exists(STATS_FILE):
+                with open(STATS_FILE, 'r') as f:
+                    return json.load(f)
         except:
-            # Remove dead connections
-            status_callbacks.remove((client_id, callback))
+            pass
+        
+        return {
+            "total_boosts": 0,
+            "successful_boosts": 0,
+            "failed_boosts": 0,
+            "last_boost": None,
+            "boost_history": []
+        }
+    
+    def start_cron(self, facebook_url, interval=30):
+        """Start the continuous booster"""
+        if self.is_running:
+            return False, "Already running"
+        
+        def run_booster():
+            try:
+                # Run the booster script
+                cmd = ["python", CRON_SCRIPT, "--continuous"]
+                self.process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True
+                )
+                
+                # Save PID
+                with open(CRON_PID_FILE, 'w') as f:
+                    f.write(str(self.process.pid))
+                
+                self.is_running = True
+                
+                # Read output
+                for line in iter(self.process.stdout.readline, ''):
+                    print(f"[BOOSTER] {line.strip()}")
+                
+                self.process.wait()
+                
+            except Exception as e:
+                print(f"Booster error: {e}")
+            finally:
+                self.is_running = False
+                if os.path.exists(CRON_PID_FILE):
+                    os.remove(CRON_PID_FILE)
+        
+        # Start in background thread
+        thread = threading.Thread(target=run_booster, daemon=True)
+        thread.start()
+        
+        return True, "Booster started"
+    
+    def stop_cron(self):
+        """Stop the continuous booster"""
+        if not self.is_running:
+            return False, "Not running"
+        
+        try:
+            # Try to kill by PID
+            if os.path.exists(CRON_PID_FILE):
+                with open(CRON_PID_FILE, 'r') as f:
+                    pid = int(f.read().strip())
+                
+                import signal
+                os.kill(pid, signal.SIGTERM)
+            
+            # Kill process if still exists
+            if self.process:
+                self.process.terminate()
+                self.process.wait(timeout=5)
+            
+            self.is_running = False
+            
+            if os.path.exists(CRON_PID_FILE):
+                os.remove(CRON_PID_FILE)
+            
+            return True, "Booster stopped"
+            
+        except Exception as e:
+            return False, f"Error stopping: {str(e)}"
+    
+    def run_single_boost(self, facebook_url):
+        """Run a single boost"""
+        try:
+            cmd = ["python", CRON_SCRIPT, facebook_url]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            # Reload stats
+            self.stats = self.load_stats()
+            
+            return {
+                "success": True,
+                "output": result.stdout,
+                "error": result.stderr if result.returncode != 0 else None
+            }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": "Timeout"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def get_status(self):
+        return {
+            "running": self.is_running,
+            "stats": self.stats,
+            "last_boost": self.stats.get("last_boost"),
+            "total_boosts": self.stats.get("total_boosts", 0),
+            "success_rate": (self.stats.get("successful_boosts", 0) / 
+                           max(self.stats.get("total_boosts", 1), 1)) * 100
+        }
+
+# Initialize cron manager
+cron_manager = CronManager()
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('cron_dashboard.html')
 
-@app.route('/start', methods=['POST'])
-def start_following():
-    global current_thread
-    
-    facebook_url = request.form.get('facebook_url')
-    duration = request.form.get('duration', '0')
+@app.route('/api/start', methods=['POST'])
+def start_booster():
+    data = request.json
+    facebook_url = data.get('facebook_url', '').strip()
+    interval = int(data.get('interval', 30))
     
     if not facebook_url or 'facebook.com' not in facebook_url:
-        return jsonify({
-            "success": False, 
-            "message": "❌ Invalid Facebook URL! Please enter a valid Facebook profile URL."
-        })
+        return jsonify({"success": False, "message": "Invalid Facebook URL"})
     
-    # Check if already running
-    if current_thread and current_thread.is_alive():
-        return jsonify({
-            "success": False, 
-            "message": "⚠️ Another process is already running!"
-        })
-    
-    # Parse duration
-    try:
-        duration = int(duration) if duration and duration != '0' else None
-    except:
-        duration = None
-    
-    def run_follower():
-        try:
-            follower_bot.start_following(facebook_url, duration, status_callback)
-        except Exception as e:
-            status_callback("error", f"❌ Bot error: {str(e)}")
-        finally:
-            status_callback("info", "🛑 Process stopped")
-    
-    # Start the follower thread
-    current_thread = threading.Thread(target=run_follower)
-    current_thread.daemon = True
-    current_thread.start()
-    
-    if duration:
-        return jsonify({
-            "success": True, 
-            "message": f"🚀 Started following process for {duration} seconds!"
-        })
-    else:
-        return jsonify({
-            "success": True, 
-            "message": "🚀 Started Facebook boost process!"
-        })
-
-@app.route('/status', methods=['GET'])
-def get_status():
-    stats = follower_bot.get_stats()
-    
-    # Calculate cooldown info
-    cooldown_info = []
-    for profile_id, last_time in follower_bot.last_order_time.items():
-        elapsed = time.time() - last_time
-        if elapsed < 86400:  # Still in cooldown
-            hours_left = (86400 - elapsed) / 3600
-            cooldown_info.append({
-                "profile": profile_id[:20] + "..." if len(profile_id) > 20 else profile_id,
-                "hours_left": round(hours_left, 1)
-            })
-    
-    stats["cooldown_info"] = cooldown_info
-    return jsonify(stats)
-
-@app.route('/stop', methods=['POST'])
-def stop_following():
-    follower_bot.stop()
-    
-    if current_thread and current_thread.is_alive():
-        current_thread.join(timeout=5)
+    success, message = cron_manager.start_cron(facebook_url, interval)
     
     return jsonify({
-        "success": True, 
-        "message": "🛑 Process stopped successfully!",
-        "follow_count": follower_bot.follow_count
+        "success": success,
+        "message": message,
+        "running": cron_manager.is_running
     })
 
-@app.route('/clear-cooldown', methods=['POST'])
-def clear_cooldown():
-    """Clear the cooldown cache (for testing)"""
-    try:
-        follower_bot.last_order_time = {}
-        follower_bot.save_order_cache()
-        return jsonify({
-            "success": True, 
-            "message": "✅ Cooldown cache cleared!"
-        })
-    except Exception as e:
-        return jsonify({
-            "success": False, 
-            "message": f"❌ Error clearing cache: {str(e)}"
-        })
-
-@app.route('/events')
-def events():
-    """Server-Sent Events endpoint for real-time updates"""
-    def generate():
-        client_id = str(time.time())
-        
-        def event_callback(status_type, message):
-            try:
-                data = {
-                    "type": status_type,
-                    "message": message,
-                    "timestamp": datetime.now().isoformat()
-                }
-                yield f"data: {json.dumps(data)}\n\n"
-            except:
-                pass
-        
-        # Add this callback to the list
-        callback = event_callback
-        status_callbacks.append((client_id, callback))
-        
-        try:
-            # Send initial connection message
-            yield f"data: {json.dumps({'type': 'info', 'message': '✅ Connected to server', 'timestamp': datetime.now().isoformat()})}\n\n"
-            
-            # Keep connection alive with heartbeats
-            while True:
-                yield f"data: {json.dumps({'type': 'ping', 'message': 'heartbeat', 'timestamp': datetime.now().isoformat()})}\n\n"
-                time.sleep(30)
-        finally:
-            # Clean up on disconnect
-            for i, (cid, cb) in enumerate(status_callbacks):
-                if cid == client_id and cb == callback:
-                    status_callbacks.pop(i)
-                    break
+@app.route('/api/stop', methods=['POST'])
+def stop_booster():
+    success, message = cron_manager.stop_cron()
     
-    return Response(generate(), mimetype='text/event-stream')
+    return jsonify({
+        "success": success,
+        "message": message,
+        "running": cron_manager.is_running
+    })
 
-@app.route('/test-api', methods=['GET'])
-def test_api():
-    """Test the zefame API directly"""
+@app.route('/api/boost', methods=['POST'])
+def single_boost():
+    data = request.json
+    facebook_url = data.get('facebook_url', '').strip()
+    
+    if not facebook_url or 'facebook.com' not in facebook_url:
+        return jsonify({"success": False, "message": "Invalid Facebook URL"})
+    
+    result = cron_manager.run_single_boost(facebook_url)
+    
+    return jsonify(result)
+
+@app.route('/api/status', methods=['GET'])
+def get_status():
+    status = cron_manager.get_status()
+    
+    # Format boost history for display
+    boost_history = []
+    for boost in status['stats'].get('boost_history', [])[-10:]:  # Last 10
+        try:
+            dt = datetime.fromisoformat(boost['timestamp'].replace('Z', '+00:00'))
+            time_ago = get_time_ago(dt)
+            
+            boost_history.append({
+                'time': dt.strftime('%H:%M:%S'),
+                'time_ago': time_ago,
+                'success': boost.get('success', False),
+                'order_id': boost.get('order_id', 'N/A'),
+                'proxy': boost.get('proxy_used', 'N/A')
+            })
+        except:
+            pass
+    
+    return jsonify({
+        "running": status['running'],
+        "total_boosts": status['total_boosts'],
+        "last_boost": status['last_boost'],
+        "success_rate": round(status['success_rate'], 1),
+        "boost_history": boost_history,
+        "stats": status['stats']
+    })
+
+@app.route('/api/test-proxies', methods=['GET'])
+def test_proxies():
+    """Test if proxies are working"""
     try:
         import requests
         
-        # Test the check endpoint
-        test_url = "https://zefame-free.com/api_free.php"
-        params = {
-            "action": "check",
-            "device": "test-device",
-            "service": 244,
-            "username": "share"
-        }
+        # Test with a simple request
+        test_url = "http://httpbin.org/ip"
         
-        response = requests.get(test_url, params=params, timeout=10)
-        result = response.json()
+        # Load proxies
+        proxies = []
+        if os.path.exists('proxies.txt'):
+            with open('proxies.txt', 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        proxies.append(line)
+        
+        results = []
+        for i, proxy in enumerate(proxies[:5]):  # Test first 5
+            try:
+                # Format proxy
+                if proxy.count(':') == 3:
+                    ip, port, user, password = proxy.split(':')
+                    proxy_url = f"http://{user}:{password}@{ip}:{port}"
+                elif proxy.count(':') == 2:
+                    ip, port, user = proxy.split(':')
+                    proxy_url = f"http://{user}@{ip}:{port}"
+                else:
+                    proxy_url = f"http://{proxy}"
+                
+                response = requests.get(test_url, 
+                                      proxies={'http': proxy_url, 'https': proxy_url},
+                                      timeout=10)
+                
+                results.append({
+                    "proxy": proxy,
+                    "status": "✅ Working",
+                    "ip": response.json().get('origin', 'Unknown')
+                })
+                
+            except Exception as e:
+                results.append({
+                    "proxy": proxy,
+                    "status": f"❌ Failed: {str(e)[:50]}",
+                    "ip": "N/A"
+                })
         
         return jsonify({
             "success": True,
-            "api_status": "reachable",
-            "response": result,
-            "service_available": result.get('success', False)
+            "total_proxies": len(proxies),
+            "tested": len(results),
+            "results": results
         })
+        
     except Exception as e:
         return jsonify({
             "success": False,
-            "api_status": "unreachable",
             "error": str(e)
         })
 
+def get_time_ago(dt):
+    """Convert datetime to 'X ago' format"""
+    now = datetime.now(dt.tzinfo if dt.tzinfo else None)
+    diff = now - dt
+    
+    seconds = diff.total_seconds()
+    
+    if seconds < 60:
+        return f"{int(seconds)}s ago"
+    elif seconds < 3600:
+        return f"{int(seconds/60)}m ago"
+    elif seconds < 86400:
+        return f"{int(seconds/3600)}h ago"
+    else:
+        return f"{int(seconds/86400)}d ago"
+
 if __name__ == '__main__':
-    print("🚀 Starting Facebook Follower Bot Server...")
-    print("🌐 Web Interface: http://localhost:5000")
-    print("📱 Make sure you have valid proxies in proxies.txt")
-    app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)
+    print("🚀 Starting Facebook Booster Dashboard...")
+    print("🌐 Open: http://localhost:5000")
+    app.run(host='0.0.0.0', port=5000, debug=True)
