@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Follower Bot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-robot"></i> Facebook Follower Bot</h1>
+            <p>Automatically increase Facebook followers using proxy rotation</p>
+        </div>
+        
+        <div class="content">
+            <form id="followerForm" method="POST">
+                <div class="form-group">
+                    <label for="facebook_url"><i class="fab fa-facebook"></i> Facebook URL:</label>
+                    <input type="url" id="facebook_url" name="facebook_url" 
+                           placeholder="https://www.facebook.com/profile.php?id=..." 
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="duration"><i class="fas fa-clock"></i> Duration (seconds):</label>
+                    <input type="number" id="duration" name="duration" value="30" min="5" required>
+                </div>
+                
+                <button type="submit" class="btn" id="submitBtn">
+                    <i class="fas fa-play"></i> Start Following
+                </button>
+            </form>
+            
+            <div id="result" class="result"></div>
+            
+            <div id="status" class="status" style="display: none;">
+                <h3><i class="fas fa-chart-line"></i> Status</h3>
+                <div class="progress-bar">
+                    <div class="progress" id="progress"></div>
+                </div>
+                <div id="progressText">0%</div>
+                
+                <div class="logs" id="logs"></div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Auto Facebook Follower Bot • Uses proxy rotation • Safe & Efficient</p>
+        </footer>
+    </div>
+
+    <script>
+        document.getElementById('followerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = document.getElementById('submitBtn');
+            const resultDiv = document.getElementById('result');
+            const statusDiv = document.getElementById('status');
+            const progressBar = document.getElementById('progress');
+            const progressText = document.getElementById('progressText');
+            const logsDiv = document.getElementById('logs');
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            resultDiv.className = 'result';
+            resultDiv.style.display = 'none';
+            statusDiv.style.display = 'block';
+            logsDiv.innerHTML = '';
+            
+            fetch('/start', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message}`;
+                    resultDiv.style.display = 'block';
+                    
+                    // Start progress tracking
+                    const duration = parseInt(document.getElementById('duration').value);
+                    let elapsed = 0;
+                    const interval = 1000; // Update every second
+                    
+                    const updateProgress = () => {
+                        elapsed += interval / 1000; // Convert to seconds
+                        const progressPercent = (elapsed / duration) * 100;
+                        
+                        if (progressPercent <= 100) {
+                            progressBar.style.width = `${progressPercent}%`;
+                            progressText.textContent = `${Math.round(progressPercent)}%`;
+                            
+                            // Add log entry
+                            if (elapsed % 5 === 0) { // Add log every 5 seconds
+                                const log = document.createElement('div');
+                                log.className = 'log info';
+                                log.innerHTML = `<i class="fas fa-info-circle"></i> [${new Date().toLocaleTimeString()}] Following in progress...`;
+                                logsDiv.appendChild(log);
+                                logsDiv.scrollTop = logsDiv.scrollHeight;
+                            }
+                        } else {
+                            clearInterval(progressInterval);
+                            progressBar.style.width = '100%';
+                            progressText.textContent = '100%';
+                            
+                            const log = document.createElement('div');
+                            log.className = 'log success';
+                            log.innerHTML = `<i class="fas fa-check-circle"></i> [${new Date().toLocaleTimeString()}] Process completed!`;
+                            logsDiv.appendChild(log);
+                            
+                            resultDiv.innerHTML = `<i class="fas fa-check-circle"></i> Process completed successfully!`;
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<i class="fas fa-play"></i> Start Following';
+                        }
+                    };
+                    
+                    const progressInterval = setInterval(updateProgress, interval);
+                    updateProgress(); // Initial call
+                    
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `<i class="fas fa-times-circle"></i> ${data.message}`;
+                    resultDiv.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-play"></i> Start Following';
+                }
+            })
+            .catch(error => {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<i class="fas fa-times-circle"></i> Error: ${error.message}`;
+                resultDiv.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-play"></i> Start Following';
+            });
+        });
+    </script>
+</body>
+</html>
