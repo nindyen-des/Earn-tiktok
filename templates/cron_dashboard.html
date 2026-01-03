@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Booster Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00dbde, #fc00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .header .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.8;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 20px;
+        }
+        
+        .card h2 {
+            color: #00dbde;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card h2 i {
+            font-size: 1.2em;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .stat-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-active {
+            background: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+        }
+        
+        .status-inactive {
+            background: #ff0000;
+            box-shadow: 0 0 10px #ff0000;
+        }
+        
+        .url-display {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            word-break: break-all;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .control-panel {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            justify-content: center;
+        }
+        
+        .btn-start {
+            background: linear-gradient(90deg, #00b09b, #96c93d);
+            color: white;
+        }
+        
+        .btn-stop {
+            background: linear-gradient(90deg, #ff416c, #ff4b2b);
+            color: white;
+        }
+        
+        .btn-single {
+            background: linear-gradient(90deg, #2193b0, #6dd5ed);
+            color: white;
+        }
+        
+        .btn-test {
+            background: linear-gradient(90deg, #8e2de2, #4a00e0);
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #00dbde;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #00dbde;
+            box-shadow: 0 0 0 2px rgba(0, 219, 222, 0.2);
+        }
+        
+        .boost-history {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .boost-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+        }
+        
+        .boost-success {
+            border-left-color: #00ff00;
+        }
+        
+        .boost-failed {
+            border-left-color: #ff0000;
+        }
+        
+        .boost-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .boost-time {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .boost-details {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .proxy-info {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 5px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            display: none;
+        }
+        
+        .alert-success {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            color: #00ff00;
+        }
+        
+        .alert-error {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.3);
+            color: #ff0000;
+        }
+        
+        .alert-info {
+            background: rgba(0, 219, 222, 0.1);
+            border: 1px solid rgba(0, 219, 222, 0.3);
+            color: #00dbde;
+        }
+        
+        .refresh-info {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #00dbde;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-bolt"></i> CRON ACTIVE</h1>
+            <div class="subtitle">Boost Monitor • Real-time Automation Status</div>
+        </div>
+        
+        <div class="dashboard">
+            <!-- Left Column -->
+            <div class="left-column">
+                <div class="card">
+                    <h2><i class="fas fa-chart-bar"></i> Statistics</h2>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-value" id="proxyCount">0</div>
+                            <div class="stat-label">PROXIES</div>
+                        </div>
+                        
+                        <div class="stat-box">
+                            <div class="stat-value" id="globalBoosts">0</div>
+                            <div class="stat-label">GLOBAL BOOSTS</div>
+                        </div>
+                        
+                        <div class="stat-box">
+                            <div class="stat-value" id="successRate">0%</div>
+                            <div class="stat-label">SUCCESS RATE</div>
+                        </div>
+                        
+                        <div class="stat-box">
+                            <div class="stat-value" id="activeStatus">OFF</div>
+                            <div class="stat-label">STATUS</div>
+                        </div>
+                    </div>
+                    
+                    <div class="status-display">
+                        <h3><i class="fas fa-sync-alt"></i> Auto-Refresh</h3>
+                        <div class="refresh-info" id="refreshInfo">
+                            Next update in <span id="countdown">30</span> seconds
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2><i class="fas fa-sliders-h"></i> Controls</h2>
+                    
+                    <div class="form-group">
+                        <label for="facebookUrl"><i class="fab fa-facebook"></i> Facebook URL</label>
+                        <input type="url" id="facebookUrl" 
+                               placeholder="https://www.facebook.com/profile.php?id=..."
+                               value="https://www.facebook.com/profile.php?id=61577360791665">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="boostInterval"><i class="fas fa-clock"></i> Interval (seconds)</label>
+                        <input type="number" id="boostInterval" value="30" min="10" max="300">
+                    </div>
+                    
+                    <div class="control-panel">
+                        <button class="btn btn-start" id="startBtn">
+                            <i class="fas fa-play"></i> Start CRON
+                        </button>
+                        <button class="btn btn-stop" id="stopBtn" disabled>
+                            <i class="fas fa-stop"></i> Stop
+                        </button>
+                    </div>
+                    
+                    <div class="control-panel">
+                        <button class="btn btn-single" id="singleBoostBtn">
+                            <i class="fas fa-bolt"></i> Single Boost
+                        </button>
+                        <button class="btn btn-test" id="testProxiesBtn">
+                            <i class="fas fa-vial"></i> Test Proxies
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column -->
+            <div class="right-column">
+                <div class="card">
+                    <h2><i class="fas fa-link"></i> Target URL</h2>
+                    <div class="url-display" id="targetUrlDisplay">
+                        https://www.facebook.com/profile.php?id=***************
+                    </div>
+                    
+                    <h2><i class="fas fa-history"></i> Boost History</h2>
+                    <div class="boost-history" id="boostHistory">
+                        <div class="boost-item boost-success">
+                            <div class="boost-header">
+                                <span>Facebook Boost</span>
+                                <span class="boost-time">35m ago</span>
+                            </div>
+                            <div class="boost-details">
+                                Order ID: 4915997 • Proxy: 192.168.1.1:8080
+                            </div>
+                        </div>
+                        
+                        <div class="boost-item boost-success">
+                            <div class="boost-header">
+                                <span>Facebook Boost</span>
+                                <span class="boost-time">41m ago</span>
+                            </div>
+                            <div class="boost-details">
+                                Order ID: 4915996 • Proxy: 192.168.1.2:8080
+                            </div>
+                        </div>
+                        
+                        <div class="boost-item boost-success">
+                            <div class="boost-header">
+                                <span>Facebook Boost</span>
+                                <span class="boost-time">96m ago</span>
+                            </div>
+                            <div class="boost-details">
+                                Order ID: 4915995 • Proxy: 192.168.1.3:8080
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert" id="alertMessage"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const proxyCount = document.getElementById('proxyCount');
+        const globalBoosts = document.getElementById('globalBoosts');
+        const successRate = document.getElementById('successRate');
+        const activeStatus = document.getElementById('activeStatus');
+        const refreshInfo = document.getElementById('refreshInfo');
+        const countdown = document.getElementById('countdown');
+        const facebookUrl = document.getElementById('facebookUrl');
+        const boostInterval = document.getElementById('boostInterval');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const singleBoostBtn = document.getElementById('singleBoostBtn');
+        const testProxiesBtn = document.getElementById('testProxiesBtn');
+        const targetUrlDisplay = document.getElementById('targetUrlDisplay');
+        const boostHistory = document.getElementById('boostHistory');
+        const alertMessage = document.getElementById('alertMessage');
+        
+        // State
+        let refreshTimer = null;
+        let countdownValue = 30;
+        let isRunning = false;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStatus();
+            startAutoRefresh();
+            
+            // Update target URL display
+            facebookUrl.addEventListener('input', function() {
+                const url = this.value;
+                const maskedUrl = url.replace(/id=\d+/, 'id=***************');
+                targetUrlDisplay.textContent = maskedUrl || 'No URL set';
+            });
+            
+            // Trigger initial update
+            facebookUrl.dispatchEvent(new Event('input'));
+        });
+        
+        // Auto-refresh every 30 seconds
+        function startAutoRefresh() {
+            clearInterval(refreshTimer);
+            countdownValue = 30;
+            
+            refreshTimer = setInterval(() => {
+                countdownValue--;
+                countdown.textContent = countdownValue;
+                
+                if (countdownValue <= 0) {
+                    loadStatus();
+                    countdownValue = 30;
+                }
+            }, 1000);
+        }
+        
+        // Load status from API
+        function loadStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    // Update stats
+                    globalBoosts.textContent = data.total_boosts || 0;
+                    successRate.textContent = `${data.success_rate || 0}%`;
+                    
+                    // Update status
+                    isRunning = data.running;
+                    if (isRunning) {
+                        activeStatus.innerHTML = '<span class="status-indicator status-active"></span> ACTIVE';
+                        startBtn.disabled = true;
+                        stopBtn.disabled = false;
+                    } else {
+                        activeStatus.innerHTML = '<span class="status-indicator status-inactive"></span> INACTIVE';
+                        startBtn.disabled = false;
+                        stopBtn.disabled = true;
+                    }
+                    
+                    // Update boost history
+                    updateBoostHistory(data.boost_history);
+                    
+                    // Load proxy count
+                    loadProxyCount();
+                })
+                .catch(error => {
+                    console.error('Status load error:', error);
+                    showAlert('error', 'Failed to load status');
+                });
+        }
+        
+        // Load proxy count
+        function loadProxyCount() {
+            fetch('/api/test-proxies')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        proxyCount.textContent = data.total_proxies || 0;
+                    }
+                })
+                .catch(() => {
+                    // If proxy test fails, try to count from file
+                    proxyCount.textContent = '?';
+                });
+        }
+        
+        // Update boost history display
+        function updateBoostHistory(history) {
+            if (!history || history.length === 0) {
+                boostHistory.innerHTML = `
+                    <div class="boost-item">
+                        <div class="boost-header">
+                            <span>No boosts yet</span>
+                            <span class="boost-time">--</span>
+                        </div>
+                        <div class="boost-details">
+                            Start boosting to see history here
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            history.forEach(boost => {
+                const statusClass = boost.success ? 'boost-success' : 'boost-failed';
+                const statusIcon = boost.success ? '✅' : '❌';
+                
+                html += `
+                    <div class="boost-item ${statusClass}">
+                        <div class="boost-header">
+                            <span>${statusIcon} Facebook Boost</span>
+                            <span class="boost-time">${boost.time_ago || boost.time}</span>
+                        </div>
+                        <div class="boost-details">
+                            Order ID: ${boost.order_id} • Proxy: ${boost.proxy ? boost.proxy.substring(0, 30) + '...' : 'N/A'}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            boostHistory.innerHTML = html;
+        }
+        
+        // Show alert message
+        function showAlert(type, message) {
+            alertMessage.className = `alert alert-${type}`;
+            alertMessage.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}`;
+            alertMessage.style.display = 'block';
+            
+            setTimeout(() => {
+                alertMessage.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Start CRON
+        startBtn.addEventListener('click', function() {
+            const url = facebookUrl.value.trim();
+            const interval = parseInt(boostInterval.value);
+            
+            if (!url || !url.includes('facebook.com')) {
+                showAlert('error', 'Please enter a valid Facebook URL');
+                return;
+            }
+            
+            if (interval < 10 || interval > 300) {
+                showAlert('error', 'Interval must be between 10 and 300 seconds');
+                return;
+            }
+            
+            startBtn.innerHTML = '<span class="loading"></span> Starting...';
+            startBtn.disabled = true;
+            
+            fetch('/api/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    facebook_url: url,
+                    interval: interval
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('success', data.message);
+                    loadStatus();
+                } else {
+                    showAlert('error', data.message);
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '<i class="fas fa-play"></i> Start CRON';
+                }
+            })
+            .catch(error => {
+                showAlert('error', 'Network error');
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<i class="fas fa-play"></i> Start CRON';
+            });
+        });
+        
+        // Stop CRON
+        stopBtn.addEventListener('click', function() {
+            stopBtn.innerHTML = '<span class="loading"></span> Stopping...';
+            stopBtn.disabled = true;
+            
+            fetch('/api/stop', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('success', data.message);
+                    loadStatus();
+                } else {
+                    showAlert('error', data.message);
+                    stopBtn.disabled = false;
+                    stopBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+                }
+            })
+            .catch(error => {
+                showAlert('error', 'Network error');
+                stopBtn.disabled = false;
+                stopBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+            });
+        });
+        
+        // Single boost
+        singleBoostBtn.addEventListener('click', function() {
+            const url = facebookUrl.value.trim();
+            
+            if (!url || !url.includes('facebook.com')) {
+                showAlert('error', 'Please enter a valid Facebook URL');
+                return;
+            }
+            
+            singleBoostBtn.innerHTML = '<span class="loading"></span> Boosting...';
+            singleBoostBtn.disabled = true;
+            
+            fetch('/api/boost', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ facebook_url: url })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('success', 'Single boost completed!');
+                    loadStatus();
+                } else {
+                    showAlert('error', data.error || 'Boost failed');
+                }
+                singleBoostBtn.disabled = false;
+                singleBoostBtn.innerHTML = '<i class="fas fa-bolt"></i> Single Boost';
+            })
+            .catch(error => {
+                showAlert('error', 'Network error');
+                singleBoostBtn.disabled = false;
+                singleBoostBtn.innerHTML = '<i class="fas fa-bolt"></i> Single Boost';
+            });
+        });
+        
+        // Test proxies
+        testProxiesBtn.addEventListener('click', function() {
+            testProxiesBtn.innerHTML = '<span class="loading"></span> Testing...';
+            testProxiesBtn.disabled = true;
+            
+            fetch('/api/test-proxies')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        let message = `Tested ${data.tested} proxies:\n`;
+                        data.results.forEach(result => {
+                            message += `\n${result.status} - ${result.proxy}`;
+                        });
+                        showAlert('info', message);
+                        loadProxyCount();
+                    } else {
+                        showAlert('error', data.error || 'Proxy test failed');
+                    }
+                    testProxiesBtn.disabled = false;
+                    testProxiesBtn.innerHTML = '<i class="fas fa-vial"></i> Test Proxies';
+                })
+                .catch(error => {
+                    showAlert('error', 'Network error');
+                    testProxiesBtn.disabled = false;
+                    testProxiesBtn.innerHTML = '<i class="fas fa-vial"></i> Test Proxies';
+                });
+        });
+        
+        // Handle page unload
+        window.addEventListener('beforeunload', function() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
+        });
+    </script>
+</body>
+</html>
